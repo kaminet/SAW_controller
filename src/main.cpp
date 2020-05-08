@@ -59,7 +59,7 @@ void statusLED() {
     } // if
     break;
   default:
-    // printf("please select correct initial state");  // This should never occur
+    // This should never occur
     break;
   }
 }
@@ -80,17 +80,22 @@ void loop()
   switch (nextAction)
   {
   case ACTION_OPEN:
+    statusLed = LED_SLOW;
     digitalWrite(myRelayPin, LOW);
     break;
   case ACTION_IDLE:
+    nextAction = ACTION_DISINFECTION;
     break;
   case ACTION_DISINFECTION:
+    statusLed = LED_FAST;
     digitalWrite(myRelayPin, HIGH);
     break;
   case ACTION_FORCE_WAIT:
+    statusLed = LED_ON;
     digitalWrite(myRelayPin, LOW);
     break;
   case ACTION_FORCE_ON:
+    statusLed = LED_FAST;
     digitalWrite(myRelayPin, HIGH);
     break;
   default:
