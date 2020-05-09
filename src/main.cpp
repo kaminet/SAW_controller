@@ -38,8 +38,8 @@
 #include <Arduino.h>
 #include "OneButton.h"
 
-#define FSM_DEBUG
-// #undef FSM_DEBUG
+// #define FSM_DEBUG
+#undef FSM_DEBUG
 
 // ---- PREPARE I/O
 #define myLED 13           // onboard LED
@@ -49,8 +49,8 @@
   #define uvcTime 3000UL   // disinfection time 1m
   #define idleTime 6000UL   // idle time 30m
 #else
-  #define uvcTime 600000UL   // disinfection time 1m
-  #define idleTime 1800000UL   // idle time 30m
+  #define uvcTime 1200000UL   // disinfection time 20m
+  #define idleTime 3600000UL   // idle time 60m
   #define doorTime 2000UL   // door seafty time
 #endif
 unsigned long curTime = 0UL;   // will store current time to avoid multiple millis() calls
@@ -174,7 +174,7 @@ void myLongPressFunction() {
     case ACTION_OPEN:
       nextAction = ACTION_DISINFECTION;
       if (firstLong == true)
-      { actionDutation = curTime + uvcTime * 4;
+      { actionDutation = curTime + uvcTime * 2;
          firstLong = false;
       } else {
         actionDutation = curTime + uvcTime;
@@ -260,7 +260,7 @@ void loop()
     if (curTime > actionDutation)
     {
       nextAction = ACTION_DISINFECTION;
-      actionDutation = curTime + uvcTime;
+      actionDutation = curTime + uvcTime / 10;
     }
     statusLed = LED_SLOW;
     digitalWrite(myRelayPin, HIGH);
