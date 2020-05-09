@@ -1,3 +1,40 @@
+/*
+ UVC-Timer.ino
+ 
+ This is a sample sketch to operate chamber with Ultra Violet C... light for disinfection purposes. 
+ 
+ Setup circuit:
+ * Connect a pushbutton or hal sensor to pin A2 (myRelayPin) and VCC, add 4,7 - 10 k resistor to GND for pulldown.
+ * Connect relay control pin to pin A1 and UVC lamp to AC thru relay COM and NO terminals.
+ * The pin 13 (myLED) is used for output status of Finite State Machine by blinking built-in LED.
+  
+ When doors are closed sketch is cycling between UVC ON and OFF (1 min ON and 30 min OFF),
+ if doors opens it goes to state OPENED.
+ In OPENED state we can force first DISINFECTION cycle to 4 x normal time by doubleclick pushbutton.
+ If we doubleclick pushbutton second time we go to FORCED_WAIT state
+ We can switch between FORCED_WAIT and FORCED_ON states by single click or return to OPENED state by doubleclick.
+
+ State-Diagram
+
+      start
+       |    +-----------d-click-----------+------------------------\
+       V    V                             |                        |
+     -----------                     --------------             ---|--------
+  +>|  OPENED   |<--2 x d-click---->|  FORCE_WAIT  |<--click-->|  FORCE_ON  |
+  |  -----------                     --------------             ------------
+  button      | longpress
+  release     V
+  |  -----------
+  +-| DISINFECT |
+  |  -----------
+  |      ^
+  |      | timers
+  |      V
+  |  -----------
+  +-|   IDLE    |
+     -----------
+ */
+
 #include <Arduino.h>
 #include "OneButton.h"
 
@@ -25,8 +62,8 @@ bool pri1 = false;
 typedef enum
 {
   ACTION_OPEN,         // set UVC "OFF"
-  ACTION_IDLE,         // seafty delay timer
-  ACTION_DISINFECTION, // set UVC "ON" timer
+  ACTION_DISINFECTION, // set UVC "ON" with timer
+  ACTION_IDLE,         // set UVC "OFF" with idle timer
   ACTION_FORCE_WAIT,   // set UVC "OFF"
   ACTION_FORCE_ON      // set UVC "ON"
 } MyActions;
@@ -205,17 +242,6 @@ void loop()
     }
     digitalWrite(myRelayPin, HIGH);
     break;
-  case ACTION_IDLE:
-    if (curTime > actionDutation)
-    {
-      nextAction = ACTION_DISINFECTION;
-      actionDutation = curTime + uvcTime;
-    }
-    statusLed = LED_SLOW;
-    digitalWrite(myRelayPin, HIGH);
-    if (digitalRead(myStartButton) == false)
-    {nextAction = ACTION_OPEN;}
-    break;
   case ACTION_DISINFECTION:
     if (curTime > actionDutation)
     {
@@ -229,6 +255,17 @@ void loop()
     } else {
       digitalWrite(myRelayPin, LOW);
     }
+    break;
+  case ACTION_IDLE:
+    if (curTime > actionDutation)
+    {
+      nextAction = ACTION_DISINFECTION;
+      actionDutation = curTime + uvcTime;
+    }
+    statusLed = LED_SLOW;
+    digitalWrite(myRelayPin, HIGH);
+    if (digitalRead(myStartButton) == false)
+    {nextAction = ACTION_OPEN;}
     break;
   case ACTION_FORCE_WAIT:
     statusLed = LED_ON;
