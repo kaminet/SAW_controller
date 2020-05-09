@@ -82,7 +82,7 @@ LedState;
 LedState statusLed = LED_OFF; // Led disabled on startup
 
 // Setup a new OneButton on pin myStartButton.  
-OneButton button(myStartButton, LOW, false);
+OneButton button(myStartButton, HIGH, false);
 
 void statusLED() {
   switch (statusLed)
@@ -249,7 +249,7 @@ void loop()
       actionDutation = curTime + idleTime;
     }
     statusLed = LED_ON;
-    if (digitalRead(myStartButton) == false)
+    if (digitalRead(myStartButton) == true)
     {nextAction = ACTION_OPEN;
     digitalWrite(myRelayPin, HIGH);
     } else {
@@ -264,7 +264,7 @@ void loop()
     }
     statusLed = LED_SLOW;
     digitalWrite(myRelayPin, HIGH);
-    if (digitalRead(myStartButton) == false)
+    if (digitalRead(myStartButton) == true)
     {nextAction = ACTION_OPEN;}
     break;
   case ACTION_FORCE_WAIT:
