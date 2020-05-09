@@ -1,17 +1,25 @@
 #include <Arduino.h>
 #include "OneButton.h"
 
+#define FSM_DEBUG
+// #undef FSM_DEBUG
+
 // ---- PREPARE I/O
 #define myLED 13           // onboard LED
 #define myStartButton 16 // A2 PC2 Button Pin
 #define myRelayPin 17   // A3 PC3 Relay for UVC LAMP
-#define uvcTime 600000UL   // disinfection time 1m
-#define idleTime 1800000UL   // idle time 30m
-#define doorTime 2000UL   // door seafty time
-
+#if defined (FSM_DEBUG)
+  #define uvcTime 3000UL   // disinfection time 1m
+  #define idleTime 6000UL   // idle time 30m
+#else
+  #define uvcTime 600000UL   // disinfection time 1m
+  #define idleTime 1800000UL   // idle time 30m
+  #define doorTime 2000UL   // door seafty time
+#endif
 unsigned long curTime = 0UL;   // will store current time to avoid multiple millis() calls
 unsigned long actionDutation = 0UL;   // will store time when action should end
 bool firstLong = false;  // first UvcTime cycle longer
+bool pri1 = false;
 
 // The actions I ca do...
 typedef enum
@@ -37,7 +45,7 @@ LedState;
 LedState statusLed = LED_OFF; // Led disabled on startup
 
 // Setup a new OneButton on pin myStartButton.  
-OneButton button(myStartButton, true);
+OneButton button(myStartButton, LOW, false);
 
 void statusLED() {
   switch (statusLed)
@@ -74,6 +82,9 @@ void statusLED() {
 
 // this function will be called when the button was pressed 1 time and them some time has passed.
 void myClickFunction() {
+#if defined (FSM_DEBUG)
+  Serial.println(F("BUTTON!"));
+#endif
   switch (nextAction)
   {
     case ACTION_FORCE_WAIT:
@@ -90,6 +101,9 @@ void myClickFunction() {
 
 // this function will be called when the button was pressed 2 times in a short timeframe.
 void myDoubleClickFunction() {
+#if defined (FSM_DEBUG)
+  Serial.println(F("BUTTON! DOUBLE"));
+#endif
   switch (nextAction)
   {
     case ACTION_FORCE_WAIT:
@@ -115,11 +129,13 @@ void myDoubleClickFunction() {
 
 // this function will be called when the button was pressed for one second.
 void myLongPressFunction() {
+#if defined (FSM_DEBUG)
+  Serial.println(F("BUTTON! LONG"));
+#endif
   switch (nextAction)
   {
     case ACTION_OPEN:
       nextAction = ACTION_DISINFECTION;
-      statusLed = LED_FAST;
       if (firstLong == true)
       { actionDutation = curTime + uvcTime * 4;
          firstLong = false;
@@ -149,10 +165,29 @@ void setup()
 
   // set 80 msec. debouncing time. Default is 50 msec.
   button.setDebounceTicks(80);
+
+  Serial.begin (115200);
+
 } // setup
 
 void loop()
 {
+ #if defined (FSM_DEBUG)
+  if (curTime % 1000 == 0)
+  {
+    if (pri1 == false)
+    {
+      pri1 = true;
+      Serial.print(F("\t PROGRESS:\t"));
+      Serial.println(nextAction);
+    }
+  } else
+  {
+    pri1 = false;
+  }
+  // digitalWrite(myLED, digitalRead(myStartButton));
+#endif
+
   // put your main code here, to run repeatedly:
   curTime = millis();
   statusLED();
@@ -161,7 +196,11 @@ void loop()
   switch (nextAction)
   {
   case ACTION_OPEN:
-    statusLed = LED_SLOW;
+    if (firstLong == true)
+    {     statusLed = LED_FAST;
+    } else {
+          statusLed = LED_SLOW;
+    }
     digitalWrite(myRelayPin, LOW);
     break;
   case ACTION_IDLE:
@@ -170,6 +209,7 @@ void loop()
       nextAction = ACTION_DISINFECTION;
       actionDutation = curTime + uvcTime;
     }
+    statusLed = LED_SLOW;
     if (digitalRead(myStartButton) == false)
     {nextAction = ACTION_OPEN;}
     break;
@@ -179,6 +219,7 @@ void loop()
       nextAction = ACTION_IDLE;
       actionDutation = curTime + idleTime;
     }
+    statusLed = LED_ON;
     if (digitalRead(myStartButton) == false)
     {nextAction = ACTION_OPEN;
     digitalWrite(myRelayPin, LOW);
