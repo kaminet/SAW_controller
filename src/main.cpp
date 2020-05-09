@@ -5,10 +5,12 @@
 #define myLED 13           // onboard LED
 #define myStartButton 16 // A2 PC2 Button Pin
 #define myRelayPin 17   // A3 PC3 Relay for UVC LAMP
-#define UvcTime 120000UL   // disinfection time
-#define DoorTime 2000UL   // door seafty time
+#define uvcTime 600000UL   // disinfection time 1m
+#define idleTime 1800000UL   // idle time 30m
+#define doorTime 2000UL   // door seafty time
 
 unsigned long curTime = 0UL;   // will store current time to avoid multiple millis() calls
+unsigned long actionDutation = 0UL;   // will store time when action should end
 bool firstLong = false;  // first UvcTime cycle longer
 
 // The actions I ca do...
@@ -116,7 +118,14 @@ void myLongPressFunction() {
   switch (nextAction)
   {
     case ACTION_OPEN:
-      nextAction = ACTION_IDLE;
+      nextAction = ACTION_DISINFECTION;
+      statusLed = LED_FAST;
+      if (firstLong == true)
+      { actionDutation = curTime + uvcTime * 4;
+         firstLong = false;
+      } else {
+        actionDutation = curTime + uvcTime;
+      }
       break;
     default:
     
@@ -156,11 +165,26 @@ void loop()
     digitalWrite(myRelayPin, LOW);
     break;
   case ACTION_IDLE:
-    nextAction = ACTION_DISINFECTION;
+    if (curTime > actionDutation)
+    {
+      nextAction = ACTION_DISINFECTION;
+      actionDutation = curTime + uvcTime;
+    }
+    if (digitalRead(myStartButton) == false)
+    {nextAction = ACTION_OPEN;}
     break;
   case ACTION_DISINFECTION:
-    statusLed = LED_FAST;
-    digitalWrite(myRelayPin, HIGH);
+    if (curTime > actionDutation)
+    {
+      nextAction = ACTION_IDLE;
+      actionDutation = curTime + idleTime;
+    }
+    if (digitalRead(myStartButton) == false)
+    {nextAction = ACTION_OPEN;
+    digitalWrite(myRelayPin, LOW);
+    } else {
+      digitalWrite(myRelayPin, HIGH);
+    }
     break;
   case ACTION_FORCE_WAIT:
     statusLed = LED_ON;
