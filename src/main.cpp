@@ -154,6 +154,7 @@ void setup()
   // put your setup code here, to run once:
   pinMode(myLED, OUTPUT);         // sets the digital pin as output
   pinMode(myRelayPin, OUTPUT); // sets the digital pin as output
+  
   // link the myClickFunction function to be called on a click event.   
   button.attachClick(myClickFunction);
 
@@ -166,8 +167,9 @@ void setup()
   // set 80 msec. debouncing time. Default is 50 msec.
   button.setDebounceTicks(80);
 
+#if defined (FSM_DEBUG)
   Serial.begin (115200);
-
+#endif
 } // setup
 
 void loop()
@@ -201,7 +203,7 @@ void loop()
     } else {
           statusLed = LED_SLOW;
     }
-    digitalWrite(myRelayPin, LOW);
+    digitalWrite(myRelayPin, HIGH);
     break;
   case ACTION_IDLE:
     if (curTime > actionDutation)
@@ -210,6 +212,7 @@ void loop()
       actionDutation = curTime + uvcTime;
     }
     statusLed = LED_SLOW;
+    digitalWrite(myRelayPin, HIGH);
     if (digitalRead(myStartButton) == false)
     {nextAction = ACTION_OPEN;}
     break;
@@ -222,18 +225,18 @@ void loop()
     statusLed = LED_ON;
     if (digitalRead(myStartButton) == false)
     {nextAction = ACTION_OPEN;
-    digitalWrite(myRelayPin, LOW);
+    digitalWrite(myRelayPin, HIGH);
     } else {
-      digitalWrite(myRelayPin, HIGH);
+      digitalWrite(myRelayPin, LOW);
     }
     break;
   case ACTION_FORCE_WAIT:
     statusLed = LED_ON;
-    digitalWrite(myRelayPin, LOW);
+    digitalWrite(myRelayPin, HIGH);
     break;
   case ACTION_FORCE_ON:
     statusLed = LED_FAST;
-    digitalWrite(myRelayPin, HIGH);
+    digitalWrite(myRelayPin, LOW);
     break;
   default:
     // printf("please select correct initial state");  // This should never occur
