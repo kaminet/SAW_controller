@@ -4,9 +4,9 @@
  This is a sample sketch to operate chamber with Ultra Violet C... light for disinfection purposes. 
  
  Setup circuit:
- * Connect a pushbutton or hal sensor to pin A2 (myRelayPin) and VCC, add 4,7 - 10 k resistor to GND for pulldown.
+ * Connect a pushbutton or hal sensor to pin A2 (motorPwm) and VCC, add 4,7 - 10 k resistor to GND for pulldown.
  * Connect relay control pin to pin A1 and UVC lamp to AC thru relay COM and NO terminals.
- * The pin 13 (myLED) is used for output status of Finite State Machine by blinking built-in LED.
+ * The pin 13 (ledSys) is used for output status of Finite State Machine by blinking built-in LED.
   
  When doors are closed sketch is cycling between UVC ON and OFF (1 min ON and 30 min OFF),
  if doors opens it goes to state OPENED.
@@ -42,9 +42,17 @@
 #undef FSM_DEBUG
 
 // ---- PREPARE I/O
-#define myLED 13           // onboard LED
-#define myStartButton 16 // A2 PC2 Button Pin
-#define myRelayPin 17   // A3 PC3 Relay for UVC LAMP
+#define ledSys 13             // PB5 onboard LED
+#define ledUp 12              // PB4 LED for UP movement
+#define ledDowm 11            // PB3 LED for DOWN movement
+#define buttonUp 6            // PD6 Command UP Button Pin
+#define buttonDown 5          // PD5 Command DOWN Button Pin
+#define buttonEndstopUp 4     // PD4 UP limit Button Pin
+#define buttonEndstopDown 2   // PD2 DOWN limitButton Pin
+#define buttonEstop 3         // PD3 emergeny stop Button Pin
+#define motorPwm 9            // PB1 Control motor speed
+#define motorCw 8             // PB0 Command motor directopn CW
+#define motorCcw 7            // PB7 Command motor directopn CCW
 #if defined (FSM_DEBUG)
   #define uvcTime 3000UL   // disinfection time 1m
   #define idleTime 6000UL   // idle time 30m
@@ -81,34 +89,34 @@ LedState;
 
 LedState statusLed = LED_OFF; // Led disabled on startup
 
-// Setup a new OneButton on pin myStartButton.  
-OneButton button(myStartButton, HIGH, false);
+// Setup a new OneButton on pin buttonUp.  
+OneButton button(buttonUp, HIGH, false);
 
 void statusLED() {
   switch (statusLed)
   {
   case LED_OFF:
     // Turn LED off
-    digitalWrite(myLED, LOW);
+    digitalWrite(ledSys, LOW);
     break;
   case LED_ON:
     // turn LED on
-    digitalWrite(myLED, HIGH);
+    digitalWrite(ledSys, HIGH);
     break;
   case LED_SLOW:
     // do a slow blinking
     if (curTime % 1000 < 500) {
-      digitalWrite(myLED, LOW);
+      digitalWrite(ledSys, LOW);
     } else {
-      digitalWrite(myLED, HIGH);
+      digitalWrite(ledSys, HIGH);
     } // if
     break;
   case LED_FAST:
     // do a fast blinking
     if (curTime % 200 < 100) {
-      digitalWrite(myLED, LOW);
+      digitalWrite(ledSys, LOW);
     } else {
-      digitalWrite(myLED, HIGH);
+      digitalWrite(ledSys, HIGH);
     } // if
     break;
   default:
@@ -189,8 +197,8 @@ void myLongPressFunction() {
 void setup()
 {
   // put your setup code here, to run once:
-  pinMode(myLED, OUTPUT);         // sets the digital pin as output
-  pinMode(myRelayPin, OUTPUT); // sets the digital pin as output
+  pinMode(ledSys, OUTPUT);         // sets the digital pin as output
+  pinMode(motorPwm, OUTPUT); // sets the digital pin as output
   
   // link the myClickFunction function to be called on a click event.   
   button.attachClick(myClickFunction);
@@ -224,7 +232,7 @@ void loop()
   {
     pri1 = false;
   }
-  // digitalWrite(myLED, digitalRead(myStartButton));
+  // digitalWrite(ledSys, digitalRead(buttonUp));
 #endif
 
   // put your main code here, to run repeatedly:
@@ -240,7 +248,7 @@ void loop()
     } else {
           statusLed = LED_SLOW;
     }
-    digitalWrite(myRelayPin, HIGH);
+    digitalWrite(motorPwm, HIGH);
     break;
   case ACTION_DISINFECTION:
     if (curTime > actionDutation)
@@ -249,11 +257,11 @@ void loop()
       actionDutation = curTime + idleTime;
     }
     statusLed = LED_ON;
-    if (digitalRead(myStartButton) == true)
+    if (digitalRead(buttonUp) == true)
     {nextAction = ACTION_OPEN;
-    digitalWrite(myRelayPin, HIGH);
+    digitalWrite(motorPwm, HIGH);
     } else {
-      digitalWrite(myRelayPin, LOW);
+      digitalWrite(motorPwm, LOW);
     }
     break;
   case ACTION_IDLE:
@@ -263,17 +271,17 @@ void loop()
       actionDutation = curTime + uvcTime / 10;
     }
     statusLed = LED_SLOW;
-    digitalWrite(myRelayPin, HIGH);
-    if (digitalRead(myStartButton) == true)
+    digitalWrite(motorPwm, HIGH);
+    if (digitalRead(buttonUp) == true)
     {nextAction = ACTION_OPEN;}
     break;
   case ACTION_FORCE_WAIT:
     statusLed = LED_ON;
-    digitalWrite(myRelayPin, HIGH);
+    digitalWrite(motorPwm, HIGH);
     break;
   case ACTION_FORCE_ON:
     statusLed = LED_FAST;
-    digitalWrite(myRelayPin, LOW);
+    digitalWrite(motorPwm, LOW);
     break;
   default:
     // printf("please select correct initial state");  // This should never occur
