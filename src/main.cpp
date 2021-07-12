@@ -53,30 +53,33 @@
 #define motorPwm 9            // PB1 Control motor speed
 #define motorCw 8             // PB0 Command motor directopn CW
 #define motorCcw 7            // PB7 Command motor directopn CCW
+
+// Define some defaults and controls
 #if defined (FSM_DEBUG)
-  #define uvcTime 3000UL   // disinfection time 1m
-  #define idleTime 6000UL   // idle time 30m
+  #define uvcTime 3000UL      // disinfection time 1m
+  #define idleTime 6000UL     // idle time 30m
 #else
   #define uvcTime 1200000UL   // disinfection time 20m
-  #define idleTime 3600000UL   // idle time 60m
-  #define doorTime 2000UL   // door seafty time
+  #define idleTime 3600000UL  // idle time 60m
+  #define doorTime 2000UL     // door seafty time
 #endif
-unsigned long curTime = 0UL;   // will store current time to avoid multiple millis() calls
+unsigned long curTime = 0UL;  // will store current time to avoid multiple millis() calls
 unsigned long actionDutation = 0UL;   // will store time when action should end
-bool firstLong = false;  // first UvcTime cycle longer
+bool firstLong = false;       // first UvcTime cycle longer
 bool pri1 = false;
 
 // The actions I ca do...
 typedef enum
 {
-  ACTION_OPEN,         // set UVC "OFF"
-  ACTION_DISINFECTION, // set UVC "ON" with timer
-  ACTION_IDLE,         // set UVC "OFF" with idle timer
-  ACTION_FORCE_WAIT,   // set UVC "OFF"
-  ACTION_FORCE_ON      // set UVC "ON"
+  ACTION_UP,           // move UP as long as UP Button is pressed
+  ACTION_CYCLE,        // move DOWN with feed to DOWN endstop
+  ACTION_IDLE,         // wait for button
+  ACTION_AUTO_UP,      // move UP with max feed to UP endstop
+  ACTION_DOWN,          // move DOWN as long as DOWN Button is pressed
+  ACTION_ESTOP         // do not move
 } MyActions;
 
-MyActions nextAction = ACTION_OPEN; // no action when starting
+MyActions nextAction = ACTION_IDLE; // no action when starting
 
 // The actions I ca do...
 typedef enum {
@@ -132,11 +135,11 @@ void myClickFunction() {
 #endif
   switch (nextAction)
   {
-    case ACTION_FORCE_WAIT:
-      nextAction = ACTION_FORCE_ON;
+    case ACTION_AUTO_UP:
+      nextAction = ACTION_DOWN;
       break;
-    case ACTION_FORCE_ON:
-      nextAction = ACTION_FORCE_WAIT;
+    case ACTION_DOWN:
+      nextAction = ACTION_AUTO_UP;
       break;
     default:
 
@@ -151,17 +154,17 @@ void myDoubleClickFunction() {
 #endif
   switch (nextAction)
   {
-    case ACTION_FORCE_WAIT:
-      nextAction = ACTION_OPEN;
+    case ACTION_AUTO_UP:
+      nextAction = ACTION_UP;
       break;
-    case ACTION_FORCE_ON:
-      nextAction = ACTION_OPEN;
+    case ACTION_DOWN:
+      nextAction = ACTION_UP;
       break;
-    case ACTION_OPEN:
+    case ACTION_UP:
       if (firstLong == true)
       {
          firstLong = false;
-         nextAction = ACTION_FORCE_WAIT;
+         nextAction = ACTION_AUTO_UP;
       } else {
         firstLong = true;
       }
@@ -179,8 +182,8 @@ void myLongPressFunction() {
 #endif
   switch (nextAction)
   {
-    case ACTION_OPEN:
-      nextAction = ACTION_DISINFECTION;
+    case ACTION_UP:
+      nextAction = ACTION_CYCLE;
       if (firstLong == true)
       { actionDutation = curTime + uvcTime * 2;
          firstLong = false;
@@ -242,7 +245,7 @@ void loop()
 
   switch (nextAction)
   {
-  case ACTION_OPEN:
+  case ACTION_UP:
     if (firstLong == true)
     {     statusLed = LED_FAST;
     } else {
@@ -250,7 +253,7 @@ void loop()
     }
     digitalWrite(motorPwm, HIGH);
     break;
-  case ACTION_DISINFECTION:
+  case ACTION_CYCLE:
     if (curTime > actionDutation)
     {
       nextAction = ACTION_IDLE;
@@ -258,7 +261,7 @@ void loop()
     }
     statusLed = LED_ON;
     if (digitalRead(buttonUp) == true)
-    {nextAction = ACTION_OPEN;
+    {nextAction = ACTION_UP;
     digitalWrite(motorPwm, HIGH);
     } else {
       digitalWrite(motorPwm, LOW);
@@ -267,19 +270,19 @@ void loop()
   case ACTION_IDLE:
     if (curTime > actionDutation)
     {
-      nextAction = ACTION_DISINFECTION;
+      nextAction = ACTION_CYCLE;
       actionDutation = curTime + uvcTime / 10;
     }
     statusLed = LED_SLOW;
     digitalWrite(motorPwm, HIGH);
     if (digitalRead(buttonUp) == true)
-    {nextAction = ACTION_OPEN;}
+    {nextAction = ACTION_UP;}
     break;
-  case ACTION_FORCE_WAIT:
+  case ACTION_AUTO_UP:
     statusLed = LED_ON;
     digitalWrite(motorPwm, HIGH);
     break;
-  case ACTION_FORCE_ON:
+  case ACTION_DOWN:
     statusLed = LED_FAST;
     digitalWrite(motorPwm, LOW);
     break;
