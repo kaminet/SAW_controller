@@ -59,10 +59,10 @@
 #define motorCcwPin 7          // PB7 Command motor directopn CCW
 
 // Define some defaults and controls
-#define accelTime 500UL    // acceleration time 0,5s
-#define autoPressDuration 1000UL    // How long press for auto
-unsigned long curTime = 0UL;  // will store current time to avoid multiple millis() calls
-unsigned long accelEnd = 0UL; // will store time when action should end
+#define accelTime 500UL          // acceleration time 0,5s
+#define autoPressDuration 1000UL // How long press for auto
+unsigned long curTime = 0UL;     // will store current time to avoid multiple millis() calls
+unsigned long accelEnd = 0UL;    // will store time when action should end
 int feedValue = 0;
 bool autoMode = false; // Is ato enabled
 bool pri1 = false;
@@ -70,10 +70,10 @@ bool pri1 = false;
 // The actions I ca do...
 typedef enum
 {
-  ACTION_UP,      // move UP as long as UP Button is pressed
-  ACTION_IDLE,    // wait for button
-  ACTION_DOWN,    // move DOWN as long as DOWN Button is pressed
-  ACTION_ESTOP    // do not move
+  ACTION_UP,   // move UP as long as UP Button is pressed
+  ACTION_IDLE, // wait for button
+  ACTION_DOWN, // move DOWN as long as DOWN Button is pressed
+  ACTION_ESTOP // do not move
 } MyActions;
 
 MyActions nextAction = ACTION_IDLE; // no action when starting
@@ -81,10 +81,11 @@ MyActions nextAction = ACTION_IDLE; // no action when starting
 // The actions I can do...
 typedef enum
 {
-  LED_OFF,  // set LED "OFF".
-  LED_ON,   // set LED "ON"
-  LED_SLOW, // blink LED "SLOW"
-  LED_FAST  // blink LED "FAST"
+  LED_OFF,      // set LED "OFF".
+  LED_ON,       // set LED "ON"
+  LED_SLOW,     // blink LED "SLOW"
+  LED_FAST,     // blink LED "FAST"
+  LED_SUPERFAST // blink LED "SUPER FAST"
 } LedState;
 
 LedState statusLed = LED_SLOW; // Led blink on startup
@@ -165,6 +166,17 @@ void statusLED()
       digitalWrite(ledSysPin, HIGH);
     } // if
     break;
+  case LED_SUPERFAST:
+    // do a fast blinking
+    if (curTime % 100 < 50)
+    {
+      digitalWrite(ledSysPin, LOW);
+    }
+    else
+    {
+      digitalWrite(ledSysPin, HIGH);
+    } // if
+    break;
   default: // This should never occur
     break;
   }
@@ -179,6 +191,10 @@ void buttonUpOnPressedFunction()
   switch (nextAction)
   {
   case ACTION_UP:
+    nextAction = ACTION_IDLE;
+    autoMode = false;
+    break;
+  case ACTION_DOWN:
     nextAction = ACTION_IDLE;
     autoMode = false;
     break;
@@ -197,9 +213,9 @@ void buttonUpOnLongPressedFunction()
   case ACTION_UP:
     autoMode = true;
     statusLed = LED_FAST;
-    #if defined(FSM_DEBUG)
-      Serial.println(F("Auto ON"));
-    #endif
+#if defined(FSM_DEBUG)
+    Serial.println(F("Auto ON"));
+#endif
     break;
   default:
     break;
@@ -213,6 +229,10 @@ void buttonDownOnPressedFunction()
 #endif
   switch (nextAction)
   {
+  case ACTION_UP:
+    nextAction = ACTION_IDLE;
+    autoMode = false;
+    break;
   case ACTION_DOWN:
     nextAction = ACTION_IDLE;
     autoMode = false;
@@ -232,9 +252,9 @@ void buttonDownOnLongPressedFunction()
   case ACTION_DOWN:
     autoMode = true;
     statusLed = LED_FAST;
-    #if defined(FSM_DEBUG)
-      Serial.println(F("Auto ON"));
-    #endif
+#if defined(FSM_DEBUG)
+    Serial.println(F("Auto ON"));
+#endif
     break;
   default:
     break;
@@ -318,7 +338,6 @@ void loop()
       Serial.println(feedValue);
       Serial.print(F("Auto:\t"));
       Serial.println(autoMode);
-
     }
   }
   else
@@ -330,19 +349,27 @@ void loop()
   // put your main code here, to run repeatedly:
   curTime = millis();
   statusLED();
+
+  buttonEstop.read();
+  if (buttonEstop.isPressed() == true)
+  {
+    nextAction = ACTION_ESTOP;
+#if defined(FSM_DEBUG)
+    Serial.println("Estop Pressed!");
+#endif
+  }
+
   buttonUp.read();   // keep watching the push buttonUp:
   buttonDown.read(); // keep watching the push buttonUp:
   buttonEndstopUp.read();
   buttonEndstopDown.read();
-  buttonEstop.read();
-
-  if (buttonEstop.isPressed() == true)
-  {
-    nextAction = ACTION_ESTOP;
-  }
 
   switch (nextAction)
   {
+  case ACTION_ESTOP:
+    digitalWrite(motorPwmPin, LOW);
+    statusLed = LED_SUPERFAST;
+    break;
   case ACTION_IDLE:
     autoMode = false;
     digitalWrite(motorPwmPin, LOW);
@@ -350,12 +377,20 @@ void loop()
     if (buttonUp.isPressed() == true)
     {
       nextAction = ACTION_UP;
+      statusLed = LED_ON;
       accelEnd = curTime + accelTime;
+#if defined(FSM_DEBUG)
+      Serial.println("UP Button Pressed!");
+#endif
     }
     if (buttonDown.isPressed() == true)
     {
       nextAction = ACTION_DOWN;
+      statusLed = LED_ON;
       accelEnd = curTime + accelTime;
+#if defined(FSM_DEBUG)
+      Serial.println("DOWN Button Pressed!");
+#endif
     }
     break;
   case ACTION_UP:
@@ -366,10 +401,10 @@ void loop()
         feedValue = 255;
         // float scale = (curTime - (accelEnd - accelTime)) / accelTime;
         // feedValue = feedValue * scale;
-        feedValue = map(curTime - (accelEnd - accelTime), 0, accelTime, 0, feedValue);     
-        #if defined(FSM_DEBUG)
-          Serial.println(feedValue);
-        #endif
+        feedValue = map(curTime - (accelEnd - accelTime), 0, accelTime, 0, feedValue);
+#if defined(FSM_DEBUG)
+        Serial.println(feedValue);
+#endif
       }
       else
       {
@@ -377,15 +412,17 @@ void loop()
         feedValue = 255;
       }
       digitalWrite(motorCwPin, LOW);
+      digitalWrite(ledDowmPin, LOW);
       digitalWrite(motorCcwPin, HIGH);
+      digitalWrite(ledUpPin, HIGH);
       analogWrite(motorPwmPin, feedValue); //PWM Speed Control
-      statusLed = LED_ON;
+      // statusLed = LED_ON;
     }
     else
     {
-      #if defined(FSM_DEBUG)
-        Serial.println(F("EndStop UP reached"));
-      #endif
+#if defined(FSM_DEBUG)
+      Serial.println(F("EndStop UP reached"));
+#endif
       nextAction = ACTION_IDLE;
       digitalWrite(motorPwmPin, LOW);
     }
@@ -396,22 +433,24 @@ void loop()
       if (curTime < accelEnd)
       {
         feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
-        feedValue = map(curTime - (accelEnd - accelTime), 0, accelTime, 0, feedValue);     
+        feedValue = map(curTime - (accelEnd - accelTime), 0, accelTime, 0, feedValue);
       }
       else
       {
         feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
       }
       digitalWrite(motorCwPin, HIGH);
+      digitalWrite(ledDowmPin, HIGH);
       digitalWrite(motorCcwPin, LOW);
+      digitalWrite(ledUpPin, LOW);
       analogWrite(motorPwmPin, feedValue); //PWM Speed Control
-      statusLed = LED_ON;
+      // statusLed = LED_ON;
     }
     else
     {
-      #if defined(FSM_DEBUG)
-        Serial.println(F("EndStop DOWN reached"));
-      #endif
+#if defined(FSM_DEBUG)
+      Serial.println(F("EndStop DOWN reached"));
+#endif
       if (autoMode == false)
       {
         nextAction = ACTION_IDLE;
@@ -423,8 +462,6 @@ void loop()
         accelEnd = curTime + accelTime;
       }
     }
-    break;
-  case ACTION_ESTOP:
     break;
   default:
     // printf("please select correct initial state");  // This should never occur
