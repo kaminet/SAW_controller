@@ -327,7 +327,6 @@ void loop()
   }
   // digitalWrite(ledSysPin, digitalRead(buttonUpPin));
 #endif
-
   // put your main code here, to run repeatedly:
   curTime = millis();
   statusLED();
@@ -362,14 +361,19 @@ void loop()
   case ACTION_UP:
     if (buttonEndstopUp.isPressed() == false)
     {
-      if (curTime > accelEnd)
+      if (curTime < accelEnd)
       {
-        // feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
         feedValue = 255;
+        // float scale = (curTime - (accelEnd - accelTime)) / accelTime;
+        // feedValue = feedValue * scale;
+        feedValue = map(curTime - (accelEnd - accelTime), 0, accelTime, 0, feedValue);     
+        #if defined(FSM_DEBUG)
+          Serial.println(feedValue);
+        #endif
       }
       else
       {
-        // feedValue = map(analogRead(feedPin), 5, 4060, 0, 255); // TODO: Acceleration logic
+        // feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
         feedValue = 255;
       }
       digitalWrite(motorCwPin, LOW);
@@ -389,13 +393,14 @@ void loop()
   case ACTION_DOWN:
     if (buttonEndstopDown.isPressed() == false)
     {
-      if (curTime > accelEnd)
+      if (curTime < accelEnd)
       {
         feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
+        feedValue = map(curTime - (accelEnd - accelTime), 0, accelTime, 0, feedValue);     
       }
       else
       {
-        feedValue = map(analogRead(feedPin), 5, 4060, 0, 255); // TODO: Acceleration logic
+        feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
       }
       digitalWrite(motorCwPin, HIGH);
       digitalWrite(motorCcwPin, LOW);
