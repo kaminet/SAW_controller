@@ -66,19 +66,17 @@
 #define idleTime 3600000UL // idle time 60m
 #define doorTime 2000UL    // door seafty time
 #endif
-unsigned long curTime = 0UL;       // will store current time to avoid multiple millis() calls
+unsigned long curTime = 0UL;  // will store current time to avoid multiple millis() calls
 unsigned long accelEnd = 0UL; // will store time when action should end
 int feedValue = 0;
-bool firstLong = false; // first UvcTime cycle longer
+bool autoMode = false; // Is ato enabled
 bool pri1 = false;
 
 // The actions I ca do...
 typedef enum
 {
   ACTION_UP,      // move UP as long as UP Button is pressed
-  ACTION_CYCLE,   // move DOWN with feed to DOWN endstop
   ACTION_IDLE,    // wait for button
-  ACTION_AUTO_UP, // move UP with max feed to UP endstop
   ACTION_DOWN,    // move DOWN as long as DOWN Button is pressed
   ACTION_ESTOP    // do not move
 } MyActions;
@@ -185,11 +183,11 @@ void buttonUpOnPressedFunction()
 #endif
   switch (nextAction)
   {
-  case ACTION_IDLE:
-    nextAction = ACTION_UP;
+  case ACTION_UP:
+    nextAction = ACTION_IDLE;
     break;
   case ACTION_DOWN:
-    nextAction = ACTION_CYCLE;
+    autoMode = true;
     break;
   default:
     break;
@@ -204,88 +202,40 @@ void buttonDownOnPressedFunction()
 #endif
   switch (nextAction)
   {
-  case ACTION_IDLE:
-    nextAction = ACTION_DOWN;
+  case ACTION_DOWN:
+    nextAction = ACTION_IDLE;
     break;
   case ACTION_UP:
-    nextAction = ACTION_AUTO_UP;
+    autoMode = true;
     break;
   default:
     break;
   }
 } // buttonDownOnPressedFunction
 
-// this function will be called when the buttonUp was pressed 2 times in a short timeframe.
-void myDoubleClickFunction()
+void buttonEstopOnPressedFunction()
 {
 #if defined(FSM_DEBUG)
-  Serial.println(F("BUTTON! DOUBLE"));
+  Serial.println(F("BUTTON!"));
 #endif
-  switch (nextAction)
-  {
-  case ACTION_AUTO_UP:
-    nextAction = ACTION_UP;
-    break;
-  case ACTION_DOWN:
-    nextAction = ACTION_UP;
-    break;
-  case ACTION_UP:
-    if (firstLong == true)
-    {
-      firstLong = false;
-      nextAction = ACTION_AUTO_UP;
-    }
-    else
-    {
-      firstLong = true;
-    }
-    break;
-  default:
-    // This should never occur
-    break;
-  }
-} // myDoubleClickFunction
-
-// this function will be called when the buttonUp was pressed for one second.
-void myLongPressFunction()
-{
-#if defined(FSM_DEBUG)
-  Serial.println(F("BUTTON! LONG"));
-#endif
-  switch (nextAction)
-  {
-  case ACTION_UP:
-    nextAction = ACTION_CYCLE;
-    if (firstLong == true)
-    {
-      accelEnd = curTime + accelTime * 2;
-      firstLong = false;
-    }
-    else
-    {
-      accelEnd = curTime + accelTime;
-    }
-    break;
-  default:
-
-    break;
-  }
-} // myLongPressFunction
+  nextAction = ACTION_IDLE;
+} // buttonDownOnPressedFunction
 
 void setup()
 {
   // put your setup code here, to run once:
   pinMode(ledSysPin, OUTPUT);   // sets the digital pin as output
-  pinMode(ledUpPin, OUTPUT);   // sets the digital pin as output
-  pinMode(ledDowmPin, OUTPUT);   // sets the digital pin as output
+  pinMode(ledUpPin, OUTPUT);    // sets the digital pin as output
+  pinMode(ledDowmPin, OUTPUT);  // sets the digital pin as output
   pinMode(motorPwmPin, OUTPUT); // sets the digital pin as output
-  pinMode(motorCwPin, OUTPUT); // sets the digital pin as output
+  pinMode(motorCwPin, OUTPUT);  // sets the digital pin as output
   pinMode(motorCcwPin, OUTPUT); // sets the digital pin as output
   pinMode(feedPin, INPUT);      // declares pin A0 as input
 
   // link the buttonUpOnPressedFunction function to be called on a click event.
   buttonUp.onPressed(buttonUpOnPressedFunction);
   buttonDown.onPressed(buttonDownOnPressedFunction);
+  buttonEstop.onPressed(buttonEstopOnPressedFunction);
 
   // link the doubleclick function to be called on a doubleclick event.
   // buttonUp.attachDoubleClick(myDoubleClickFunction);
@@ -329,6 +279,11 @@ void loop()
   buttonEndstopDown.read();
   buttonEstop.read();
 
+  if (buttonEstop.isPressed() == true)
+  {
+    nextAction = ACTION_ESTOP;
+  }
+
   switch (nextAction)
   {
   case ACTION_IDLE:
@@ -358,7 +313,7 @@ void loop()
       }
       digitalWrite(motorCwPin, LOW);
       digitalWrite(motorCcwPin, HIGH);
-      analogWrite(motorPwmPin, feedValue);   //PWM Speed Control
+      analogWrite(motorPwmPin, feedValue); //PWM Speed Control
       statusLed = LED_SLOW;
     }
     else
@@ -368,7 +323,7 @@ void loop()
     }
     break;
   case ACTION_DOWN:
-    if (buttonEndstopUp.isPressed() == false)
+    if (buttonEndstopDown.isPressed() == false)
     {
       if (curTime > accelEnd)
       {
@@ -378,36 +333,25 @@ void loop()
       {
         feedValue = map(analogRead(feedPin), 0, 1023, 0, 255); // TODO: Acceleration logic
       }
-      digitalWrite(motorCwPin, LOW);
-      digitalWrite(motorCcwPin, HIGH);
-      analogWrite(motorPwmPin, feedValue);   //PWM Speed Control
+      digitalWrite(motorCwPin, HIGH);
+      digitalWrite(motorCcwPin, LOW);
+      analogWrite(motorPwmPin, feedValue); //PWM Speed Control
     }
     else
     {
-      nextAction = ACTION_IDLE;
-      digitalWrite(motorPwmPin, LOW);
+      if (autoMode == false)
+      {
+        nextAction = ACTION_IDLE;
+        digitalWrite(motorPwmPin, LOW);
+      }
+      else
+      {
+        nextAction = ACTION_UP;
+        accelEnd = curTime + accelTime;
+      }
     }
     break;
-  case ACTION_CYCLE:
-    if (curTime > accelEnd)
-    {
-      nextAction = ACTION_IDLE;
-      accelEnd = curTime + idleTime;
-    }
-    statusLed = LED_ON;
-    if (digitalRead(buttonUpPin) == true)
-    {
-      nextAction = ACTION_UP;
-      digitalWrite(motorPwmPin, HIGH);
-    }
-    else
-    {
-      digitalWrite(motorPwmPin, LOW);
-    }
-    break;
-  case ACTION_AUTO_UP:
-    statusLed = LED_ON;
-    digitalWrite(motorPwmPin, HIGH);
+  case ACTION_ESTOP:
     break;
   default:
     // printf("please select correct initial state");  // This should never occur
