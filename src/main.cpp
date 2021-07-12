@@ -39,6 +39,7 @@
 // #include "OneButton.h"
 #include <EasyButton.h>
 // #include <LogansGreatButton.h>
+// #include <ObjectButton.h>
 
 #define FSM_DEBUG
 // #undef FSM_DEBUG
@@ -273,11 +274,18 @@ void setup()
   pinMode(motorCcwPin, OUTPUT); // sets the digital pin as output
   pinMode(feedPin, INPUT);      // declares pin A0 as input
 
+  // Initialize the button.
+  buttonUp.begin();
+  buttonDown.begin();
+  buttonEstop.begin();
+  buttonEndstopUp.begin();
+  buttonEndstopDown.begin();
+
   // link the buttonUpOnPressedFunction function to be called on a click event.
   buttonUp.onPressed(buttonUpOnPressedFunction);
   buttonUp.onPressedFor(autoPressDuration, buttonUpOnLongPressedFunction);
   buttonDown.onPressed(buttonDownOnPressedFunction);
-  buttonDown.onPressedFor(autoPressDuration, buttonDownOnPressedFunction);
+  buttonDown.onPressedFor(autoPressDuration, buttonDownOnLongPressedFunction);
   buttonEstop.onPressed(buttonEstopOnPressedFunction);
   buttonEndstopUp.onPressed(buttonEndstopUpPressedFunction);
   buttonEndstopDown.onPressed(buttonEndstopDowmPressedFunction);
