@@ -44,14 +44,15 @@
 #undef FSM_DEBUG
 
 // ---- PREPARE I/O
-#define ledSysPin 13           // PB5 onboard LED
-#define ledUpPin 12            // PB4 LED for UP movement
-#define ledDowmPin 11          // PB3 LED for DOWN movement
 #define buttonUpPin 6          // PD6 Command UP Button Pin
 #define buttonDownPin 5        // PD5 Command DOWN Button Pin
 #define buttonEndstopUpPin 4   // PD4 UP limit Button Pin
 #define buttonEndstopDownPin 2 // PD2 DOWN limitButton Pin
 #define buttonEstopPin 3       // PD3 emergeny stop Button Pin
+#define feedPin A0             // PC0 feed speed potentiometer
+#define ledSysPin 13           // PB5 onboard LED
+#define ledUpPin 12            // PB4 LED for UP movement
+#define ledDowmPin 11          // PB3 LED for DOWN movement
 #define motorPwmPin 9          // PB1 Control motor speed
 #define motorCwPin 8           // PB0 Command motor directopn CW
 #define motorCcwPin 7          // PB7 Command motor directopn CCW
@@ -61,13 +62,14 @@
 #define uvcTime 3000UL  // disinfection time 1m
 #define idleTime 6000UL // idle time 30m
 #else
-#define uvcTime 1200000UL  // disinfection time 20m
+#define accelTime 500UL    // acceleration time 0,5s
 #define idleTime 3600000UL // idle time 60m
 #define doorTime 2000UL    // door seafty time
 #endif
-unsigned long curTime = 0UL;        // will store current time to avoid multiple millis() calls
-unsigned long actionDutation = 0UL; // will store time when action should end
-bool firstLong = false;             // first UvcTime cycle longer
+unsigned long curTime = 0UL;       // will store current time to avoid multiple millis() calls
+unsigned long accelDutation = 0UL; // will store time when action should end
+int feedValue = 0;
+bool firstLong = false; // first UvcTime cycle longer
 bool pri1 = false;
 
 // The actions I ca do...
@@ -110,9 +112,30 @@ EasyButton buttonUp(
 
 EasyButton buttonDown(
     buttonDownPin, // Input pin for the button
-    35,          // Debounce time
-    true,        // Enable internal pullup resistor
-    true         // Invert button logic. If true, low = pressed else high = pressed
+    35,            // Debounce time
+    true,          // Enable internal pullup resistor
+    true           // Invert button logic. If true, low = pressed else high = pressed
+);
+
+EasyButton buttonEndstopUp(
+    buttonEndstopUpPin, // Input pin for the button
+    35,                 // Debounce time
+    true,               // Enable internal pullup resistor
+    true                // Invert button logic. If true, low = pressed else high = pressed
+);
+
+EasyButton buttonEndstopDown(
+    buttonEndstopDownPin, // Input pin for the button
+    35,                   // Debounce time
+    true,                 // Enable internal pullup resistor
+    true                  // Invert button logic. If true, low = pressed else high = pressed
+);
+
+EasyButton buttonEstop(
+    buttonEstopPin, // Input pin for the button
+    35,             // Debounce time
+    true,           // Enable internal pullup resistor
+    true            // Invert button logic. If true, low = pressed else high = pressed
 );
 
 void statusLED()
@@ -235,12 +258,12 @@ void myLongPressFunction()
     nextAction = ACTION_CYCLE;
     if (firstLong == true)
     {
-      actionDutation = curTime + uvcTime * 2;
+      accelDutation = curTime + accelTime * 2;
       firstLong = false;
     }
     else
     {
-      actionDutation = curTime + uvcTime;
+      accelDutation = curTime + accelTime;
     }
     break;
   default:
@@ -254,6 +277,7 @@ void setup()
   // put your setup code here, to run once:
   pinMode(ledSysPin, OUTPUT);   // sets the digital pin as output
   pinMode(motorPwmPin, OUTPUT); // sets the digital pin as output
+  pinMode(feedPin, INPUT);      // declares pin A0 as input
 
   // link the buttonUpOnPressedFunction function to be called on a click event.
   buttonUp.onPressed(buttonUpOnPressedFunction);
@@ -295,61 +319,73 @@ void loop()
   // put your main code here, to run repeatedly:
   curTime = millis();
   statusLED();
-  buttonUp.read(); // keep watching the push buttonUp:
+  buttonUp.read();   // keep watching the push buttonUp:
+  buttonDown.read(); // keep watching the push buttonUp:
+  buttonEndstopUp.read();
+  buttonEndstopDown.read();
+  buttonEstop.read();
 
   switch (nextAction)
   {
-  case ACTION_UP:
-    if (firstLong == true)
-    {
-      statusLed = LED_FAST;
-    }
-    else
-    {
-      statusLed = LED_SLOW;
-    }
-    digitalWrite(motorPwmPin, HIGH);
-    break;
-  case ACTION_CYCLE:
-    if (curTime > actionDutation)
-    {
-      nextAction = ACTION_IDLE;
-      actionDutation = curTime + idleTime;
-    }
-    statusLed = LED_ON;
-    if (digitalRead(buttonUpPin) == true)
-    {
-      nextAction = ACTION_UP;
-      digitalWrite(motorPwmPin, HIGH);
-    }
-    else
-    {
-      digitalWrite(motorPwmPin, LOW);
-    }
-    break;
   case ACTION_IDLE:
-    if (curTime > actionDutation)
-    {
-      nextAction = ACTION_CYCLE;
-      actionDutation = curTime + uvcTime / 10;
-    }
-    statusLed = LED_SLOW;
-    digitalWrite(motorPwmPin, HIGH);
-    if (digitalRead(buttonUpPin) == true)
+    if (buttonUp.isPressed() == true)
     {
       nextAction = ACTION_UP;
+      accelDutation = curTime + accelTime;
+    }
+    if (buttonDown.isPressed() == true)
+    {
+      nextAction = ACTION_DOWN;
+      accelDutation = curTime + accelTime;
     }
     break;
-  case ACTION_AUTO_UP:
-    statusLed = LED_ON;
-    digitalWrite(motorPwmPin, HIGH);
-    break;
-  case ACTION_DOWN:
-    statusLed = LED_FAST;
-    digitalWrite(motorPwmPin, LOW);
-    break;
-  default:
-    // printf("please select correct initial state");  // This should never occur
-    break;
+  case ACTION_UP:
+    if (buttonEndstopUp.isPressed() == false)
+    {
+      if (curTime > accelDutation)
+      {
+        nextAction = ACTION_IDLE;
+        accelDutation = curTime + idleTime;
+      }
+      else
+      {
+        feedValue = map(analogRead(feedPin), 0, 1023, 0, 255);
+        nextAction = ACTION_DOWN;
+        accelDutation = curTime + accelTime;
+      }
+      else
+      {
+        nextAction = ACTION_IDLE;
+        digitalWrite(motorPwmPin, LOW);
+      }
+      break;
+    case ACTION_CYCLE:
+      if (curTime > accelDutation)
+      {
+        nextAction = ACTION_IDLE;
+        accelDutation = curTime + idleTime;
+      }
+      statusLed = LED_ON;
+      if (digitalRead(buttonUpPin) == true)
+      {
+        nextAction = ACTION_UP;
+        digitalWrite(motorPwmPin, HIGH);
+      }
+      else
+      {
+        digitalWrite(motorPwmPin, LOW);
+      }
+      break;
+    case ACTION_AUTO_UP:
+      statusLed = LED_ON;
+      digitalWrite(motorPwmPin, HIGH);
+      break;
+    case ACTION_DOWN:
+      statusLed = LED_FAST;
+      digitalWrite(motorPwmPin, LOW);
+      break;
+    default:
+      // printf("please select correct initial state");  // This should never occur
+      break;
+    }
   }
-}
