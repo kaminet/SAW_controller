@@ -364,11 +364,13 @@ void loop()
     {
       if (curTime > accelEnd)
       {
-        feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
+        // feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
+        feedValue = 255;
       }
       else
       {
-        feedValue = map(analogRead(feedPin), 5, 4060, 0, 255); // TODO: Acceleration logic
+        // feedValue = map(analogRead(feedPin), 5, 4060, 0, 255); // TODO: Acceleration logic
+        feedValue = 255;
       }
       digitalWrite(motorCwPin, LOW);
       digitalWrite(motorCcwPin, HIGH);
