@@ -67,7 +67,7 @@
 #define doorTime 2000UL    // door seafty time
 #endif
 unsigned long curTime = 0UL;       // will store current time to avoid multiple millis() calls
-unsigned long accelDutation = 0UL; // will store time when action should end
+unsigned long accelEnd = 0UL; // will store time when action should end
 int feedValue = 0;
 bool firstLong = false; // first UvcTime cycle longer
 bool pri1 = false;
@@ -258,12 +258,12 @@ void myLongPressFunction()
     nextAction = ACTION_CYCLE;
     if (firstLong == true)
     {
-      accelDutation = curTime + accelTime * 2;
+      accelEnd = curTime + accelTime * 2;
       firstLong = false;
     }
     else
     {
-      accelDutation = curTime + accelTime;
+      accelEnd = curTime + accelTime;
     }
     break;
   default:
@@ -276,7 +276,11 @@ void setup()
 {
   // put your setup code here, to run once:
   pinMode(ledSysPin, OUTPUT);   // sets the digital pin as output
+  pinMode(ledUpPin, OUTPUT);   // sets the digital pin as output
+  pinMode(ledDowmPin, OUTPUT);   // sets the digital pin as output
   pinMode(motorPwmPin, OUTPUT); // sets the digital pin as output
+  pinMode(motorCwPin, OUTPUT); // sets the digital pin as output
+  pinMode(motorCcwPin, OUTPUT); // sets the digital pin as output
   pinMode(feedPin, INPUT);      // declares pin A0 as input
 
   // link the buttonUpOnPressedFunction function to be called on a click event.
@@ -328,64 +332,85 @@ void loop()
   switch (nextAction)
   {
   case ACTION_IDLE:
+    digitalWrite(motorPwmPin, LOW);
+    statusLed = LED_ON;
     if (buttonUp.isPressed() == true)
     {
       nextAction = ACTION_UP;
-      accelDutation = curTime + accelTime;
+      accelEnd = curTime + accelTime;
     }
     if (buttonDown.isPressed() == true)
     {
       nextAction = ACTION_DOWN;
-      accelDutation = curTime + accelTime;
+      accelEnd = curTime + accelTime;
     }
     break;
   case ACTION_UP:
     if (buttonEndstopUp.isPressed() == false)
     {
-      if (curTime > accelDutation)
-      {
-        nextAction = ACTION_IDLE;
-        accelDutation = curTime + idleTime;
-      }
-      else
+      if (curTime > accelEnd)
       {
         feedValue = map(analogRead(feedPin), 0, 1023, 0, 255);
-        nextAction = ACTION_DOWN;
-        accelDutation = curTime + accelTime;
       }
       else
       {
-        nextAction = ACTION_IDLE;
-        digitalWrite(motorPwmPin, LOW);
+        feedValue = map(analogRead(feedPin), 0, 1023, 0, 255); // TODO: Acceleration logic
       }
-      break;
-    case ACTION_CYCLE:
-      if (curTime > accelDutation)
-      {
-        nextAction = ACTION_IDLE;
-        accelDutation = curTime + idleTime;
-      }
-      statusLed = LED_ON;
-      if (digitalRead(buttonUpPin) == true)
-      {
-        nextAction = ACTION_UP;
-        digitalWrite(motorPwmPin, HIGH);
-      }
-      else
-      {
-        digitalWrite(motorPwmPin, LOW);
-      }
-      break;
-    case ACTION_AUTO_UP:
-      statusLed = LED_ON;
-      digitalWrite(motorPwmPin, HIGH);
-      break;
-    case ACTION_DOWN:
-      statusLed = LED_FAST;
-      digitalWrite(motorPwmPin, LOW);
-      break;
-    default:
-      // printf("please select correct initial state");  // This should never occur
-      break;
+      digitalWrite(motorCwPin, LOW);
+      digitalWrite(motorCcwPin, HIGH);
+      analogWrite(motorPwmPin, feedValue);   //PWM Speed Control
+      statusLed = LED_SLOW;
     }
+    else
+    {
+      nextAction = ACTION_IDLE;
+      digitalWrite(motorPwmPin, LOW);
+    }
+    break;
+  case ACTION_DOWN:
+    if (buttonEndstopUp.isPressed() == false)
+    {
+      if (curTime > accelEnd)
+      {
+        feedValue = map(analogRead(feedPin), 0, 1023, 0, 255);
+      }
+      else
+      {
+        feedValue = map(analogRead(feedPin), 0, 1023, 0, 255); // TODO: Acceleration logic
+      }
+      digitalWrite(motorCwPin, LOW);
+      digitalWrite(motorCcwPin, HIGH);
+      analogWrite(motorPwmPin, feedValue);   //PWM Speed Control
+    }
+    else
+    {
+      nextAction = ACTION_IDLE;
+      digitalWrite(motorPwmPin, LOW);
+    }
+    break;
+  case ACTION_CYCLE:
+    if (curTime > accelEnd)
+    {
+      nextAction = ACTION_IDLE;
+      accelEnd = curTime + idleTime;
+    }
+    statusLed = LED_ON;
+    if (digitalRead(buttonUpPin) == true)
+    {
+      nextAction = ACTION_UP;
+      digitalWrite(motorPwmPin, HIGH);
+    }
+    else
+    {
+      digitalWrite(motorPwmPin, LOW);
+    }
+    break;
+  case ACTION_AUTO_UP:
+    statusLed = LED_ON;
+    digitalWrite(motorPwmPin, HIGH);
+    break;
+  default:
+    // printf("please select correct initial state");  // This should never occur
+    break;
   }
+}
