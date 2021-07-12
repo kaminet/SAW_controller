@@ -40,8 +40,8 @@
 #include <EasyButton.h>
 #include <LogansGreatButton.h>
 
-// #define FSM_DEBUG
-#undef FSM_DEBUG
+#define FSM_DEBUG
+// #undef FSM_DEBUG
 
 // ---- PREPARE I/O
 #define buttonUpPin 6          // PD6 Command UP Button Pin
@@ -59,11 +59,10 @@
 
 // Define some defaults and controls
 #if defined(FSM_DEBUG)
-#define uvcTime 3000UL  // disinfection time 1m
-#define idleTime 6000UL // idle time 30m
+#define accelTime 500UL    // acceleration time 0,5s
+#define doorTime 2000UL    // door seafty time
 #else
 #define accelTime 500UL    // acceleration time 0,5s
-#define idleTime 3600000UL // idle time 60m
 #define doorTime 2000UL    // door seafty time
 #endif
 unsigned long curTime = 0UL;  // will store current time to avoid multiple millis() calls
@@ -175,11 +174,11 @@ void statusLED()
   }
 }
 
-// this function will be called when the buttonUp was pressed 1 time and them some time has passed.
+// these functions will be called when the button is released.
 void buttonUpOnPressedFunction()
 {
 #if defined(FSM_DEBUG)
-  Serial.println(F("BUTTON!"));
+  Serial.println(F("UP button released!!"));
 #endif
   switch (nextAction)
   {
@@ -188,17 +187,20 @@ void buttonUpOnPressedFunction()
     break;
   case ACTION_DOWN:
     autoMode = true;
+    statusLed = LED_FAST;
+    #if defined(FSM_DEBUG)
+      Serial.println(F("Auto ON"));
+    #endif
     break;
   default:
     break;
   }
 } // buttonUpOnPressedFunction
 
-// this function will be called when the buttonDown was pressed 1 time and them some time has passed.
 void buttonDownOnPressedFunction()
 {
 #if defined(FSM_DEBUG)
-  Serial.println(F("BUTTON!"));
+  Serial.println(F("DOWN button released!"));
 #endif
   switch (nextAction)
   {
@@ -207,6 +209,10 @@ void buttonDownOnPressedFunction()
     break;
   case ACTION_UP:
     autoMode = true;
+    statusLed = LED_FAST;
+    #if defined(FSM_DEBUG)
+      Serial.println(F("Auto ON"));
+    #endif
     break;
   default:
     break;
@@ -216,7 +222,7 @@ void buttonDownOnPressedFunction()
 void buttonEstopOnPressedFunction()
 {
 #if defined(FSM_DEBUG)
-  Serial.println(F("BUTTON!"));
+  Serial.println(F("ESTOP button released!"));
 #endif
   nextAction = ACTION_IDLE;
 } // buttonDownOnPressedFunction
@@ -287,8 +293,9 @@ void loop()
   switch (nextAction)
   {
   case ACTION_IDLE:
+    autoMode = false;
     digitalWrite(motorPwmPin, LOW);
-    statusLed = LED_ON;
+    statusLed = LED_SLOW;
     if (buttonUp.isPressed() == true)
     {
       nextAction = ACTION_UP;
@@ -311,10 +318,14 @@ void loop()
       {
         feedValue = map(analogRead(feedPin), 0, 1023, 0, 255); // TODO: Acceleration logic
       }
+      #if defined(FSM_DEBUG)
+        Serial.println(F("calculated PWM!"));
+        Serial.println(feedValue);
+      #endif
       digitalWrite(motorCwPin, LOW);
       digitalWrite(motorCcwPin, HIGH);
       analogWrite(motorPwmPin, feedValue); //PWM Speed Control
-      statusLed = LED_SLOW;
+      statusLed = LED_ON;
     }
     else
     {
@@ -336,6 +347,7 @@ void loop()
       digitalWrite(motorCwPin, HIGH);
       digitalWrite(motorCcwPin, LOW);
       analogWrite(motorPwmPin, feedValue); //PWM Speed Control
+      statusLed = LED_ON;
     }
     else
     {
