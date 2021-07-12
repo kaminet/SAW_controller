@@ -36,9 +36,9 @@
  */
 
 #include <Arduino.h>
-#include "OneButton.h"
+// #include "OneButton.h"
 #include <EasyButton.h>
-#include <LogansGreatButton.h>
+// #include <LogansGreatButton.h>
 
 #define FSM_DEBUG
 // #undef FSM_DEBUG
@@ -58,13 +58,8 @@
 #define motorCcwPin 7          // PB7 Command motor directopn CCW
 
 // Define some defaults and controls
-#if defined(FSM_DEBUG)
 #define accelTime 500UL    // acceleration time 0,5s
-#define doorTime 2000UL    // door seafty time
-#else
-#define accelTime 500UL    // acceleration time 0,5s
-#define doorTime 2000UL    // door seafty time
-#endif
+#define autoPressDuration 1000UL    // How long press for auto
 unsigned long curTime = 0UL;  // will store current time to avoid multiple millis() calls
 unsigned long accelEnd = 0UL; // will store time when action should end
 int feedValue = 0;
@@ -178,14 +173,27 @@ void statusLED()
 void buttonUpOnPressedFunction()
 {
 #if defined(FSM_DEBUG)
-  Serial.println(F("UP button released!!"));
+  Serial.println(F("UP button released!"));
 #endif
   switch (nextAction)
   {
   case ACTION_UP:
     nextAction = ACTION_IDLE;
+    autoMode = false;
     break;
-  case ACTION_DOWN:
+  default:
+    break;
+  }
+} // buttonUpOnPressedFunction
+
+void buttonUpOnLongPressedFunction()
+{
+#if defined(FSM_DEBUG)
+  Serial.println(F("UP Long button released!"));
+#endif
+  switch (nextAction)
+  {
+  case ACTION_UP:
     autoMode = true;
     statusLed = LED_FAST;
     #if defined(FSM_DEBUG)
@@ -195,7 +203,7 @@ void buttonUpOnPressedFunction()
   default:
     break;
   }
-} // buttonUpOnPressedFunction
+}
 
 void buttonDownOnPressedFunction()
 {
@@ -206,8 +214,21 @@ void buttonDownOnPressedFunction()
   {
   case ACTION_DOWN:
     nextAction = ACTION_IDLE;
+    autoMode = false;
     break;
-  case ACTION_UP:
+  default:
+    break;
+  }
+} // buttonDownOnPressedFunction
+
+void buttonDownOnLongPressedFunction()
+{
+#if defined(FSM_DEBUG)
+  Serial.println(F("Down Long button released!"));
+#endif
+  switch (nextAction)
+  {
+  case ACTION_DOWN:
     autoMode = true;
     statusLed = LED_FAST;
     #if defined(FSM_DEBUG)
@@ -217,7 +238,7 @@ void buttonDownOnPressedFunction()
   default:
     break;
   }
-} // buttonDownOnPressedFunction
+}
 
 void buttonEstopOnPressedFunction()
 {
@@ -225,6 +246,20 @@ void buttonEstopOnPressedFunction()
   Serial.println(F("ESTOP button released!"));
 #endif
   nextAction = ACTION_IDLE;
+} // buttonDownOnPressedFunction
+
+void buttonEndstopUpPressedFunction()
+{
+#if defined(FSM_DEBUG)
+  Serial.println(F("Endstop UP button released!"));
+#endif
+} // buttonDownOnPressedFunction
+
+void buttonEndstopDowmPressedFunction()
+{
+#if defined(FSM_DEBUG)
+  Serial.println(F("Endstop Down button released!"));
+#endif
 } // buttonDownOnPressedFunction
 
 void setup()
@@ -240,8 +275,12 @@ void setup()
 
   // link the buttonUpOnPressedFunction function to be called on a click event.
   buttonUp.onPressed(buttonUpOnPressedFunction);
+  buttonUp.onPressedFor(autoPressDuration, buttonUpOnLongPressedFunction);
   buttonDown.onPressed(buttonDownOnPressedFunction);
+  buttonDown.onPressedFor(autoPressDuration, buttonDownOnPressedFunction);
   buttonEstop.onPressed(buttonEstopOnPressedFunction);
+  buttonEndstopUp.onPressed(buttonEndstopUpPressedFunction);
+  buttonEndstopDown.onPressed(buttonEndstopDowmPressedFunction);
 
   // link the doubleclick function to be called on a doubleclick event.
   // buttonUp.attachDoubleClick(myDoubleClickFunction);
@@ -267,6 +306,11 @@ void loop()
       pri1 = true;
       Serial.print(F("\t PROGRESS:\t"));
       Serial.println(nextAction);
+      Serial.print(F("calculated PWM:\t"));
+      Serial.println(feedValue);
+      Serial.print(F("Auto:\t"));
+      Serial.println(autoMode);
+
     }
   }
   else
@@ -312,16 +356,12 @@ void loop()
     {
       if (curTime > accelEnd)
       {
-        feedValue = map(analogRead(feedPin), 0, 1023, 0, 255);
+        feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
       }
       else
       {
-        feedValue = map(analogRead(feedPin), 0, 1023, 0, 255); // TODO: Acceleration logic
+        feedValue = map(analogRead(feedPin), 5, 4060, 0, 255); // TODO: Acceleration logic
       }
-      #if defined(FSM_DEBUG)
-        Serial.println(F("calculated PWM!"));
-        Serial.println(feedValue);
-      #endif
       digitalWrite(motorCwPin, LOW);
       digitalWrite(motorCcwPin, HIGH);
       analogWrite(motorPwmPin, feedValue); //PWM Speed Control
@@ -329,6 +369,9 @@ void loop()
     }
     else
     {
+      #if defined(FSM_DEBUG)
+        Serial.println(F("EndStop UP reached"));
+      #endif
       nextAction = ACTION_IDLE;
       digitalWrite(motorPwmPin, LOW);
     }
@@ -338,11 +381,11 @@ void loop()
     {
       if (curTime > accelEnd)
       {
-        feedValue = map(analogRead(feedPin), 0, 1023, 0, 255);
+        feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
       }
       else
       {
-        feedValue = map(analogRead(feedPin), 0, 1023, 0, 255); // TODO: Acceleration logic
+        feedValue = map(analogRead(feedPin), 5, 4060, 0, 255); // TODO: Acceleration logic
       }
       digitalWrite(motorCwPin, HIGH);
       digitalWrite(motorCcwPin, LOW);
@@ -351,6 +394,9 @@ void loop()
     }
     else
     {
+      #if defined(FSM_DEBUG)
+        Serial.println(F("EndStop DOWN reached"));
+      #endif
       if (autoMode == false)
       {
         nextAction = ACTION_IDLE;
