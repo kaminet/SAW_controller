@@ -1,20 +1,32 @@
 /*
- UVC-Timer.ino
- 
- This is a sample sketch to operate chamber with Ultra Violet C... light for disinfection purposes. 
- 
- Setup circuit:
- * Connect a pushbutton or hal sensor to pin A2 (motorPwmPin) and VCC, add 4,7 - 10 k resistor to GND for pulldown.
- * Connect relay control pin to pin A1 and UVC lamp to AC thru relay COM and NO terminals.
- * The pin 13 (ledSysPin) is used for output status of Finite State Machine by blinking built-in LED.
-  
- When doors are closed sketch is cycling between UVC ON and OFF (1 min ON and 30 min OFF),
- if doors opens it goes to state OPENED.
- In OPENED state we can force first DISINFECTION cycle to 4 x normal time by doubleclick pushbutton.
- If we doubleclick pushbutton second time we go to FORCED_WAIT state
- We can switch between FORCED_WAIT and FORCED_ON states by single click or return to OPENED state by doubleclick.
+ SAW_controller
 
+This is a sketch to operate circular saw. It offers manual control and automatic down move with automatic retract. 
+
+Circuit setup:
+* Inputs
+  * Connect a push-buttons to command UP, DOWN, E-STOP to pins 6, 5, 3 (with optional 4,7 - 10 k pull-up resistor to VCC) and 1 - 2 k resistor from other side of button to GND for activation by low state.
+  * Connect a push-buttons or other proximity sensor to detect UP end-stop and DOWN end-stop to pins 4, 2 (with optional 4,7 - 10 k pull-up resistor to VCC) and 1 - 2 k resistor from other side of button to GND for activation by low state.
+  * Connect a potentiometer to set feed speed, wiper to pin A0 and ends of 4,7 - 50 k potentiometer between VCC nad GND.
+* Outputs
+  * Connect H bridge (like LM298) signals PWM (EN), CW, CCW signals to pins 9, 8, 7.
+  * Optionally connect LEDs signaling motor direction to pins 11, 12. TODO: rework LEDs behavior
+  * The pin 13 (ledSysPin) is used for status indication of Finite State Machine by blinking built-in LED.
+
+We move saw UP and DOWN by pressing respective button.
+If button is held for 1 second it will latch and we can release button.
+When button is lathed we can unlatch it by pressing and releasing UP or Down button. TODO: rework to react to pressing.
+When move is in automatic mode it will continue until it reach end-stop.
+After hitting DOWN end-stop, saw will reverse and go UP.
+After hitting UP end-stop, it will end cycle.
+Feed is used for move DOWN. Move UP is always at full speed.
+Feed speed (PWM) is set by potentiometer and can be changed at any time.
+Motor is accelerated for 0.5 s on start of move, and stopped without deceleration.
+E-STOP button stops motor, and ignore inputs until released.
+ 
  State-Diagram
+
+ 
 
       start
        |    +-----------d-click-----------+------------------------\
