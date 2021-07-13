@@ -43,7 +43,7 @@ E-STOP button stops motor, and ignore inputs until released.
             +----------+                          +----------+             |
              |       ^                             |        ^              |
 DOWN button  |       | UP or DOWN       UP button  |        | UP or DOWN   |
-held over 1s |       |   button       held over 1s |        |   button     |
+ longpress   |       |   button         longpress  |        |   button     |
              V       |  released                   V        |  released    |
             +----------+                          +----------+             |
             |   auto   |       DOWN end-stop      |   auto   |             |
