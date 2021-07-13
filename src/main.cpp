@@ -49,10 +49,10 @@ DOWN button  |       | UP or DOWN       UP button  |        | UP or DOWN   |
             |   auto   |       DOWN end-stop      |   auto   |             |
             |   DOWN   |------------------------->|    UP    |-------------+
             +----------+                          +----------+ 
-
+*/
 
 #include <Arduino.h>
-// #include "OneButton.h"
+
 #include <EasyButton.h>
 // #include <LogansGreatButton.h>
 // #include <ObjectButton.h>
