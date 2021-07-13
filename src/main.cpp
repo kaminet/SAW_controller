@@ -26,26 +26,30 @@ E-STOP button stops motor, and ignore inputs until released.
  
  State-Diagram
 
+ TODO: Split MoveUP and MoveDOWN to unlatched and latched states
  
+                                      START               E-STOP button released
+                                        |    +----------------------------------------------+
+                                        V    V                                              |
+                                     +-----------+                                    +-------------+        E-STOP
+                                     |   IDLE    |<------------------------+          |    E-STOP   |<------ button
+                      +--------------|           |-------+                 |          +-------------+        pressed
+          DOWN button |              +-----------+       |                 |
+            pressed   |                                  |                 |
+                      V                                  |                 |
+            +----------+                          +----------+             |
+            |   Move   |                          |   Move   |             |
+            |   DOWN   |                          |    UP    |             |
+            +----------+                          +----------+             |
+             |       ^                             |        ^              |
+DOWN button  |       | UP or DOWN       UP button  |        | UP or DOWN   |
+held over 1s |       |   button       held over 1s |        |   button     |
+             V       |  released                   V        |  released    |
+            +----------+                          +----------+             |
+            |   auto   |       DOWN end-stop      |   auto   |             |
+            |   DOWN   |------------------------->|    UP    |-------------+
+            +----------+                          +----------+ 
 
-      start
-       |    +-----------d-click-----------+------------------------\
-       V    V                             |                        |
-     -----------                     --------------             ---|--------
-  +>|  OPENED   |<--2 x d-click---->|  FORCE_WAIT  |<--click-->|  FORCE_ON  |
-  |  -----------                     --------------             ------------
-  button      | longpress
-  release     V
-  |  -----------
-  +-| DISINFECT |
-  |  -----------
-  |      ^
-  |      | timers
-  |      V
-  |  -----------
-  +-|   IDLE    |
-     -----------
- */
 
 #include <Arduino.h>
 // #include "OneButton.h"
