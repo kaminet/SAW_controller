@@ -25,9 +25,7 @@ Motor is accelerated for 0.5 s on start of move, and stopped without deceleratio
 E-STOP button stops motor, and ignore inputs until released.
  
  State-Diagram
-
- TODO: Split MoveUP and MoveDOWN to unlatched and latched states
- 
+  
                                       START               E-STOP button released
                                         |    +----------------------------------------------+
                                         V    V                                              |
@@ -50,12 +48,10 @@ DOWN button  |       | UP or DOWN       UP button  |        | UP or DOWN   |
             |   DOWN   |------------------------->|    UP    |-------------+
             +----------+                          +----------+ 
 */
+// TODO: move motor hanfling to separate function
 
 #include <Arduino.h>
-
 #include <EasyButton.h>
-// #include <LogansGreatButton.h>
-// #include <ObjectButton.h>
 
 #define FSM_DEBUG
 // #undef FSM_DEBUG
@@ -78,10 +74,10 @@ DOWN button  |       | UP or DOWN       UP button  |        | UP or DOWN   |
 #define accelTime 500UL          // acceleration time 0,5s
 #define autoPressDuration 1000UL // How long press for auto
 unsigned long curTime = 0UL;     // will store current time to avoid multiple millis() calls
-unsigned long accelEnd = 0UL;    // will store time when action should end
-int feedValue = 0;
-bool autoMode = false; // Is ato enabled
-bool pri1 = false;
+unsigned long accelEnd = 0UL;    // will store time when acceleration should end
+int feedValue = 0;               // motor PWM setpoint
+bool autoMode = false;           // Is auto enabled
+bool pri1 = false;               // 1s debug helper
 
 // The actions I ca do...
 typedef enum
@@ -90,9 +86,9 @@ typedef enum
   ACTION_IDLE, // wait for button
   ACTION_DOWN, // move DOWN as long as DOWN Button is pressed
   ACTION_ESTOP // do not move
-} MyActions;
+} MyActions;   // TODO: Split ACTION_UP and ACTION_DOWN to unlatched and latched states
 
-MyActions nextAction = ACTION_IDLE; // no action when starting
+MyActions nextAction = ACTION_IDLE; // Start at IDLE
 
 // The actions I can do...
 typedef enum
@@ -105,13 +101,6 @@ typedef enum
 } LedState;
 
 LedState statusLed = LED_SLOW; // Led blink on startup
-
-// Setup a new OneButton on pin buttonUpPin.
-// OneButton buttonUp(
-//   buttonUpPin,     // Input pin for the button
-//   HIGH,            // Button is active high
-//   false            // Disable internal pull-up resistor
-// );
 
 EasyButton buttonUp(
     buttonUpPin, // Input pin for the button
@@ -161,7 +150,7 @@ void statusLED()
     digitalWrite(ledSysPin, HIGH);
     break;
   case LED_SLOW:
-    // do a slow blinking
+    // do a 500 ms blinking
     if (curTime % 1000 < 500)
     {
       digitalWrite(ledSysPin, LOW);
@@ -172,7 +161,7 @@ void statusLED()
     } // if
     break;
   case LED_FAST:
-    // do a fast blinking
+    // do a 100 ms blinking
     if (curTime % 200 < 100)
     {
       digitalWrite(ledSysPin, LOW);
@@ -183,7 +172,7 @@ void statusLED()
     } // if
     break;
   case LED_SUPERFAST:
-    // do a fast blinking
+    // do a 50 ms blinking
     if (curTime % 100 < 50)
     {
       digitalWrite(ledSysPin, LOW);
@@ -217,7 +206,7 @@ void buttonUpOnPressedFunction()
   default:
     break;
   }
-} // buttonUpOnPressedFunction
+} // actions for buttonUpOnPressed
 
 void buttonUpOnLongPressedFunction()
 {
@@ -236,7 +225,7 @@ void buttonUpOnLongPressedFunction()
   default:
     break;
   }
-}
+} // actions for buttonUpOnLongPressed
 
 void buttonDownOnPressedFunction()
 {
@@ -256,7 +245,7 @@ void buttonDownOnPressedFunction()
   default:
     break;
   }
-} // buttonDownOnPressedFunction
+} // actions for buttonDownOnPressed
 
 void buttonDownOnLongPressedFunction()
 {
@@ -275,7 +264,7 @@ void buttonDownOnLongPressedFunction()
   default:
     break;
   }
-}
+} // actions for buttonDownOnLongPressed
 
 void buttonEstopOnPressedFunction()
 {
@@ -283,21 +272,21 @@ void buttonEstopOnPressedFunction()
   Serial.println(F("ESTOP button released!"));
 #endif
   nextAction = ACTION_IDLE;
-} // buttonDownOnPressedFunction
+} // actions for buttonEstopOnPressed
 
 void buttonEndstopUpPressedFunction()
 {
 #if defined(FSM_DEBUG)
   Serial.println(F("Endstop UP button released!"));
 #endif
-} // buttonDownOnPressedFunction
+} // actions for buttonEndstopUpPressed
 
 void buttonEndstopDowmPressedFunction()
 {
 #if defined(FSM_DEBUG)
   Serial.println(F("Endstop Down button released!"));
 #endif
-} // buttonDownOnPressedFunction
+} // actions for buttonEndstopDowmPressed
 
 void setup()
 {
@@ -310,35 +299,30 @@ void setup()
   pinMode(motorCcwPin, OUTPUT); // sets the digital pin as output
   pinMode(feedPin, INPUT);      // declares pin A0 as input
 
-  // Initialize the button.
+  // Initialize the buttons.
   buttonUp.begin();
   buttonDown.begin();
   buttonEstop.begin();
   buttonEndstopUp.begin();
   buttonEndstopDown.begin();
 
-  // link the buttonUpOnPressedFunction function to be called on a click event.
+  // link the button functions to be called on a click event.
   buttonUp.onPressed(buttonUpOnPressedFunction);
-  buttonUp.onPressedFor(autoPressDuration, buttonUpOnLongPressedFunction);
   buttonDown.onPressed(buttonDownOnPressedFunction);
-  buttonDown.onPressedFor(autoPressDuration, buttonDownOnLongPressedFunction);
   buttonEstop.onPressed(buttonEstopOnPressedFunction);
   buttonEndstopUp.onPressed(buttonEndstopUpPressedFunction);
   buttonEndstopDown.onPressed(buttonEndstopDowmPressedFunction);
 
+  // link the button functions to be called on a longpress event.
+  buttonUp.onPressedFor(autoPressDuration, buttonUpOnLongPressedFunction);
+  buttonDown.onPressedFor(autoPressDuration, buttonDownOnLongPressedFunction);
+
   // link the doubleclick function to be called on a doubleclick event.
-  // buttonUp.attachDoubleClick(myDoubleClickFunction);
-
-  // link the longpress function to be called on a longpress event.
-  // buttonUp.attachLongPressStart(myLongPressFunction);
-
-  // set 80 msec. debouncing time. Default is 50 msec.
-  // buttonUp.setDebounceTicks(80);
 
 #if defined(FSM_DEBUG)
   Serial.begin(115200);
 #endif
-} // setup
+} // setup uart for debug
 
 void loop()
 {
@@ -360,8 +344,8 @@ void loop()
   {
     pri1 = false;
   }
-  // digitalWrite(ledSysPin, digitalRead(buttonUpPin));
-#endif
+#endif //some stats for debug
+
   // put your main code here, to run repeatedly:
   curTime = millis();
   statusLED();
@@ -373,10 +357,10 @@ void loop()
 #if defined(FSM_DEBUG)
     Serial.println("Estop Pressed!");
 #endif
-  }
+  } // Handle E-STOP
 
-  buttonUp.read();   // keep watching the push buttonUp:
-  buttonDown.read(); // keep watching the push buttonUp:
+  buttonUp.read();           // update button
+  buttonDown.read();
   buttonEndstopUp.read();
   buttonEndstopDown.read();
 
@@ -415,8 +399,6 @@ void loop()
       if (curTime < accelEnd)
       {
         feedValue = 255;
-        // float scale = (curTime - (accelEnd - accelTime)) / accelTime;
-        // feedValue = feedValue * scale;
         feedValue = map(curTime - (accelEnd - accelTime), 0, accelTime, 0, feedValue);
 #if defined(FSM_DEBUG)
         Serial.println(feedValue);
@@ -479,8 +461,8 @@ void loop()
       }
     }
     break;
-  default:
-    // printf("please select correct initial state");  // This should never occur
+  default: // This should never occur
+    // printf("please select correct initial state");
     break;
   }
 }
