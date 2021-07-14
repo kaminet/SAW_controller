@@ -368,11 +368,19 @@ void loop()
   {
   case ACTION_ESTOP:
     digitalWrite(motorPwmPin, LOW);
+    digitalWrite(motorCwPin, LOW);
+    digitalWrite(ledDowmPin, LOW);
+    digitalWrite(motorCcwPin, LOW);
+    digitalWrite(ledUpPin, LOW);
     statusLed = LED_SUPERFAST;
     break;
   case ACTION_IDLE:
     autoMode = false;
     digitalWrite(motorPwmPin, LOW);
+    digitalWrite(motorCwPin, LOW);
+    digitalWrite(ledDowmPin, LOW);
+    digitalWrite(motorCcwPin, LOW);
+    digitalWrite(ledUpPin, LOW);
     statusLed = LED_SLOW;
     if (buttonUp.isPressed() == true)
     {
@@ -394,9 +402,9 @@ void loop()
     }
     break;
   case ACTION_UP:
-    if (buttonEndstopUp.isPressed() == false)
+    if (buttonEndstopUp.isPressed() == false) // check for endstop
     {
-      if (curTime < accelEnd)
+      if (curTime < accelEnd) // accelerate
       {
         feedValue = 255;
         feedValue = map(curTime - (accelEnd - accelTime), 0, accelTime, 0, feedValue);
@@ -426,9 +434,9 @@ void loop()
     }
     break;
   case ACTION_DOWN:
-    if (buttonEndstopDown.isPressed() == false)
+    if (buttonEndstopDown.isPressed() == false) // check for endstop
     {
-      if (curTime < accelEnd)
+      if (curTime < accelEnd) // accelerate
       {
         feedValue = map(analogRead(feedPin), 5, 4060, 0, 255);
         feedValue = map(curTime - (accelEnd - accelTime), 0, accelTime, 0, feedValue);
@@ -454,7 +462,7 @@ void loop()
         nextAction = ACTION_IDLE;
         digitalWrite(motorPwmPin, LOW);
       }
-      else
+      else // when auto mode and end-stop go UP
       {
         nextAction = ACTION_UP;
         accelEnd = curTime + accelTime;
